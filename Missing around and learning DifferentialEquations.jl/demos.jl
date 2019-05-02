@@ -60,7 +60,7 @@ function heat(du,u,L,t)
 end
 
 prob = ODEProblem(heat, u0,tspan,L)
-
+sol = solve(prob)
 plot(x,Ti*sol(0.0))
 plot!(x,Ti*sol(0.5))
 plot!(x,Ti*sol(2.0))

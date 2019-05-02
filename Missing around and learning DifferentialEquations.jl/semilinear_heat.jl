@@ -5,15 +5,16 @@ using Plots; gr()
 
 function SemiLinearHeat(;non_homo::Function,tspan,u0,B1::Symbol,B2::Symbol, params = [1.0,0.5])
 
-    dx = (u0[end]-u0[1])/(length(u0)-1) # Deciding the step in the x variable
-
     N = length(u0)       # Deciding the length of the u0 to be able to build Our Derivative
-
+    dx = 1/N # Deciding the step in the x variable
 
     # Dirichlet Boundary Conditions
 
     if B1 in  Set([:Dirichlet0,:Dirichlet]) && B2 in Set([:Dirichlet0,:Dirichlet])
-        A= DerivativeOperator{Float64}(2,2,dx,N,B1,B2;BC=(u0[1],u0[end]))
+        A= DerivativeOperator{Float64}(2,2,dx,N,:None,:None)
+        function heat(du,u,L,t)
+            mul!(du,L,u)
+        end
     end
 
 
@@ -36,22 +37,69 @@ function SemiLinearHeat(;non_homo::Function,tspan,u0,B1::Symbol,B2::Symbol, para
         BC = ((params[1],params[2],left_RBC),(params[1],params[2],right_RBC)))
     end
 
-    f(u,p,t) = A*u + non_homo(u)  # This is the heat equation with a non-linear Part
-    prob = ODEProblem(f , u0 ,tspan)
+    f(u,p,t) = A*u .+ non_homo(u)  # This is the heat equation with a non-linear Part
+    prob = ODEProblem(heat , u0 ,tspan,A)
+
+
 end
 
 
 
-# A problem example
-
-dx = 2*pi/15
-x = collect(-pi : dx : pi)
-u0 = @. -(x - 0.5).^2 + 1/12
 
 
 
 
+#######################################################
+# More generalized function
 
-non_homo(u) =3*u
-prob = SemiLinearHeat(non_homo = non_homo ,tspan = (0.0,5.0),u0=u0,B1=:Neumann,B2=:Neumann)
-plot(solve(prob))
+
+
+
+
+u0= T*cos.(cos.(x.-0.1))
+
+D2 = Derivative(S,2)
+L = D2[1:n,1:n]
+tspan = (0.0,10.0)
+
+
+function heat(du,u,L,t)
+    mul!(du,L,u)
+end
+
+
+function SemiLinearHeat(domain, discretization, u0, non_linear)
+    if discretization == "ApproxFun"
+
+        S = Fourier()
+        n=100
+        x = points(S,n)
+        T = ApproxFun.plan_transform(S,n)
+        Ti = ApproxFun.plan_itransform(S,n)
+        u0= T*u0
+        D2 = Derivative(S,2)
+        L = D2[1:n,1:n]
+
+        function heat(du,u,L,t)
+            mul!(du,L,u)
+        end
+
+        prob = ODEProblem(heat, u0,domain,L)
+
+    end
+
+end
+
+
+
+u0 = cos.(cos.(x.-0.1))
+non_homo(u) =0;
+
+prob = SemiLinearHeat((0.0,10.0), "ApproxFun", u0, non_homo)
+sol = solve(prob)
+plot(x,Ti*sol(10.0))
+plot!(x,Ti*sol(0.5))
+plot!(x,Ti*sol(2.0))
+plot!(x,Ti*sol(3.0))
+
+    
